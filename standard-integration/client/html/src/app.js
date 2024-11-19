@@ -22,8 +22,8 @@ window.paypal
           body: JSON.stringify({
             cart: [
               {
-                id: "YOUR_PRODUCT_ID",
-                quantity: "YOUR_PRODUCT_QUANTITY",
+                id: "ABC_0987654",
+                quantity: "1",
               },
             ],
           }),
