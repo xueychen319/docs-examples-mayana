@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Add meta tags for mobile and IE -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http - equiv="X-UA-Compatible" content="IE=edge" />
+
+
+  <title>PayPal JS SDK Standard Integration</title>
+  <link rel="stylesheet" type="text/css"
+    href="https://www.paypalobjects.com/webstatic/en_US/developer/docs/css/cardfields.css" />
+
+<body>
+  <script
+    src="https://www.paypal.com/sdk/js?client-id=AUiPimL_g-pfKFnzIhWXXVxO_A_hGJLcSF4Zcv6o7FfCkOXo0erMTp-_5s8frSfa0QWk4brumr_9dCE5&components=buttons,funding-eligibility&enable-funding=card&disable-funding=venmo,paylater">
+    </script>
+
+  <label style="display: block;">
+    <input type="radio" name="payment-option" value="paypal" checked>
+    <p style="display: inline;">PayPal</p>
+  </label>
+
+  <div id="paypal-button-container">
+    <p id="result-message"></p>
+  </div>
+
+  <div id="paypal-card-container">
+
+  </div>
+
+  <div style="height: 1cm;"></div>
+
+  <label style="display: block;">
+    <input type="radio" name="payment-option" value="alternate">
+    <p style="display: inline;">Other Debit/Credit Cards</p>
+  </label>
+
+  <div style="height: 1cm;"></div>
+
+  <div id="alternate-button-container">
+  </div>
+
+  <script>
+    // Listen for changes to the radio buttons
+    document.querySelectorAll('input[name=payment-option]')
+      .forEach(function (el) {
+        el.addEventListener('change', function (event) {
+
+          // If PayPal is selected, show the PayPal button
+          if (event.target.value === 'paypal') {
+            // when radio button PayPal is selected, remove alternate button because
+            // it will be created when on select radio button
+            document.getElementById("alternate-button-container").innerHTML = "";
+
+            document.body.querySelector('#paypal-button-container')
+              .style.display = 'block';
+            document.body.querySelector('#paypal-card-container')
+              .style.display = 'block';
+          }
+
+          // If alternate funding is selected, show a different button
+          if (event.target.value === 'alternate') {
+            paypal.Buttons({
+              fundingSource: "card",
+              expandCardForm: true,
+              async createOrder() {
+                try {
+                  const response = await fetch("/api/orders", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+
+                    // use the "body" param to optionally pass additional order information
+                    // like product ids and quantities
+                    body: JSON.stringify({
+                      cart: [
+                        {
+                          id: "ABC_0987654",
+                          quantity: "1",
+                        },
+                      ],
+                    }),
+                  });
+
+                  const orderData = await response.json();
+                  if (orderData.id) {
+                    return orderData.id;
+                  }
+                  const errorDetail = orderData?.details?.[0];
+                  const errorMessage = errorDetail
+                    ? `${errorDetail.issue} ${errorDetail.description} (${orderData.debug_id})`
+                    : JSON.stringify(orderData);
+                  throw new Error(errorMessage);
+                } catch (error) {
+                  console.error(error);
+                  resultMessage(`Could not initiate PayPal Checkout...<br><br>${error}`);
+                }
+              },
+              // Uncomment this code to test on shipping change, card form autorender will not be effect with it.
+              // async onShippingChange(data, actions) {
+              //   if (data.shipping_address.country_code !== 'US') {
+              //     return actions.reject();
+              //   }
+              //   return actions.resolve();
+              // },
+              async onApprove(data, actions) {
+                try {
+                  const response = await fetch(`/api/orders/${data.orderID}/capture`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                  });
+
+                  const orderData = await response.json();
+                  // Three cases to handle:
+                  //   (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+                  //   (2) Other non-recoverable errors -> Show a failure message
+                  //   (3) Successful transaction -> Show confirmation or thank you message
+
+                  const errorDetail = orderData?.details?.[0];
+                  if (errorDetail?.issue === "INSTRUMENT_DECLINED") {
+                    // (1) Recoverable INSTRUMENT_DECLINED -> call actions.restart()
+                    // recoverable state, per
+                    // https://developer.paypal.com/docs/checkout/standard/customize/handle-funding-failures/
+                    return actions.restart();
+                  } else if (errorDetail) {
+                    // (2) Other non-recoverable errors -> Show a failure message
+                    throw new Error(`${errorDetail.description} (${orderData.debug_id})`);
+                  } else if (!orderData.purchase_units) {
+                    throw new Error(JSON.stringify(orderData));
+                  } else {
+                    // (3) Successful transaction -> Show confirmation or thank you message
+                    // Or go to another URL:  actions.redirect('thank_you.html');
+                    const transaction =
+                      orderData?.purchase_units?.[0]?.payments?.captures?.[0] ||
+                      orderData?.purchase_units?.[0]?.payments?.authorizations?.[0];
+                    resultMessage(
+                      `Transaction ${transaction.status}: ${transaction.id}<br>
+          <br>See console for all available details`
+                    );
+                    console.log(
+                      "Capture result",
+                      orderData,
+                      JSON.stringify(orderData, null, 2)
+                    );
+                  }
+                } catch (error) {
+                  console.error(error);
+                  resultMessage(
+                    `Sorry, your transaction could not be processed...<br><br>${error}`
+                  );
+                }
+              },
+            }).render('#alternate-button-container');
+
+            document.body.querySelector('#alternate-button-container')
+              .style.display = 'block';
+            document.body.querySelector('#paypal-button-container')
+              .style.display = 'none';
+            document.body.querySelector('#paypal-card-container')
+              .style.display = 'none';
+          }
+        });
+      });
+  </script>
+</body>
+
+</html>
+  <script type="module" crossorigin src="/assets/index-DxxQHNWx.js"></script>
+</head>

@@ -124,6 +124,8 @@ app.post("/api/orders/:orderID/capture", async (req, res) => {
   }
 });
 
+app.use(express.static('../../client/html/src/public'));
+
 app.listen(PORT, () => {
   console.log(`Node server listening at http://localhost:${PORT}/`);
 });
